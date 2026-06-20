@@ -29,6 +29,18 @@ import os
 
 VERSION = "0.1.2"
 
+# EG Starts USB Encoder (10 Buttons -> Tasten 1-0)
+EG_BET_UP = pygame.K_1      # Button 1  -> bet up
+EG_BET_DOWN = pygame.K_2    # Button 2  -> bet down
+EG_SPIN = pygame.K_3        # Button 3  -> spin / enter
+EG_ADD_CREDIT = pygame.K_4  # Button 4  -> +5 credits
+EG_ADD_CREDIT2 = pygame.K_5 # Button 5  -> +5 credits
+EG_MAX_BET = pygame.K_6     # Button 6  -> max bet
+EG_HELP = pygame.K_7        # Button 7  -> help
+EG_COLLECT = pygame.K_8     # Button 8  -> collect / end game
+EG_EXIT = pygame.K_9        # Button 9  -> exit to menu
+EG_ESCAPE = pygame.K_0      # Button 10 -> escape
+
 # main menu###########################
 class Menu:
     def __init__(self):
@@ -69,17 +81,17 @@ class Menu:
                     exit()
                 if self.event.type == pygame.KEYDOWN:
                     self.bsound.play()
-                    if self.event.key == pygame.K_LEFT:
+                    if self.event.key in (pygame.K_LEFT, EG_BET_DOWN):
                         if self.selectedmenu == 0:
                             self.selectedmenu = len(self.menu)-1
                         else:
                             self.selectedmenu = self.selectedmenu-1
-                    elif self.event.key == pygame.K_RIGHT:
+                    elif self.event.key in (pygame.K_RIGHT, EG_BET_UP):
                         if self.selectedmenu == len(self.menu)-1:
                             self.selectedmenu = 0
                         else:
                             self.selectedmenu = self.selectedmenu+1
-                    elif self.event.key == pygame.K_RETURN:
+                    elif self.event.key in (pygame.K_RETURN, EG_SPIN):
                         if self.selectedmenu == 0:
                             plc = Game()
                         elif self.selectedmenu == 1:
@@ -88,7 +100,7 @@ class Menu:
                             self.selectedmenu = 2 # :)
                         else:
                             exit()
-                    if self.event.key == pygame.K_ESCAPE:
+                    if self.event.key in (pygame.K_ESCAPE, EG_ESCAPE, EG_EXIT):
                         exit()
             # 1st layer: background color
             self.screen.fill(self.maincolor)
@@ -188,21 +200,23 @@ class Settings:
                     exit()
                 if self.event.type == pygame.KEYDOWN:
                     self.bsound.play()
-                    if self.event.key == pygame.K_LEFT:
+                    if self.event.key in (pygame.K_LEFT, EG_BET_DOWN):
                         if self.selectedmenu == 0:
                             self.selectedmenu = len(self.menu)-1
                         else:
                             self.selectedmenu = self.selectedmenu-1
-                    elif self.event.key == pygame.K_RIGHT:
+                    elif self.event.key in (pygame.K_RIGHT, EG_BET_UP):
                         if self.selectedmenu == len(self.menu)-1:
                             self.selectedmenu = 0
                         else:
                             self.selectedmenu = self.selectedmenu+1
-                    elif self.event.key == pygame.K_RETURN:
+                    elif self.event.key in (pygame.K_RETURN, EG_SPIN):
                         if self.selectedmenu == 0:
                             pygame.display.toggle_fullscreen()
                         else:
                             plc = Menu()
+                    if self.event.key in (pygame.K_ESCAPE, EG_ESCAPE, EG_EXIT):
+                        exit()
             # 1st layer: background color
             self.screen.fill(self.maincolor)
             self.bg = self.menubg[szam]
@@ -314,7 +328,7 @@ class Game:
                     
                 if event.type == pygame.KEYDOWN:
                     self.bsound.play()
-                    if event.key == pygame.K_LEFT and self.keys == 1:
+                    if event.key in (pygame.K_LEFT, EG_SPIN) and self.keys == 1:
                         if self.credit > 0:
                             if self.credit - self.bet < 0:
                                 self.bet = self.credit
@@ -330,31 +344,39 @@ class Game:
                             plc = Menu()
                             
                     if self.credit > 0:
-                        if event.key == pygame.K_UP and self.keys == 1:
+                        if event.key in (pygame.K_UP, EG_BET_UP) and self.keys == 1:
                             if self.credit - self.bet - 1 >= 0:
                                 self.bet = self.bet + 1
                             else:
                                 self.bet = 1
                             if self.bet == 11:
                                 self.bet = 1
-                            
+                        elif event.key == EG_BET_DOWN and self.keys == 1:
+                            if self.bet > 1:
+                                self.bet = self.bet - 1
+                            else:
+                                self.bet = 1
+                        elif event.key == EG_MAX_BET and self.keys == 1:
+                            self.bet = min(self.credit, 10)
                     else:
                         self.bet = 0
-                            
-                            
-                    if event.key == pygame.K_F1:
+
+                    if event.key in (EG_ADD_CREDIT, EG_ADD_CREDIT2):
+                        self.credit = self.credit + 5
+
+                    if event.key in (pygame.K_F1, EG_HELP):
                         if self.keys == 1:
                             self.keys = 0
                             self.menu = "h"
                         elif self.keys == 0:
                             self.keys = 1
                             self.menu = "n"
-                            
-                    if event.key == pygame.K_RETURN:
+
+                    if event.key in (pygame.K_RETURN, EG_COLLECT):
                         self.keys = 0
                         self.menu = "e"
-                      
-                    if event.key == pygame.K_ESCAPE and self.keys == 1:
+
+                    if event.key in (pygame.K_ESCAPE, EG_EXIT, EG_ESCAPE) and self.keys == 1:
                         self.bgsound.stop()
                         plc = Menu()
                             
