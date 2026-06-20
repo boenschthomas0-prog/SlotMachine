@@ -301,6 +301,8 @@ class Game:
         
         self.bgsound.play(loops=-1)
         
+        self.randi()
+        
         # mainloop
         while True:
             self.screen.fill([0, 0, 0])
