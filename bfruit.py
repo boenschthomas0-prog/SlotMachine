@@ -57,6 +57,40 @@ EG_COLLECT = pygame.K_8
 EG_EXIT = pygame.K_9
 EG_ESCAPE = pygame.K_0
 
+# Slot-Konfiguration
+NUM_COLS = 5
+NUM_ROWS = 3
+SYMB_W = 100
+SYMB_H = 100
+GAP = 2
+NUM_SYMBOLS = 8
+SCREEN_W = 800
+SCREEN_H = 600
+REEL_X0 = 15
+REEL_Y0 = 50
+COL_W = SYMB_W + GAP
+ROW_H = SYMB_H + GAP
+
+# Gewinnlinien (3er-Blöcke über die Walzen)
+WIN_LINES = [
+    [0, 3, 6],      # obere Reihe Cols 0-2
+    [1, 4, 7],      # mittlere Reihe Cols 0-2
+    [2, 5, 8],      # untere Reihe Cols 0-2
+    [3, 6, 9],      # obere Reihe Cols 1-3
+    [4, 7, 10],     # mittlere Reihe Cols 1-3
+    [5, 8, 11],     # untere Reihe Cols 1-3
+    [6, 9, 12],     # obere Reihe Cols 2-4
+    [7, 10, 13],    # mittlere Reihe Cols 2-4
+    [8, 11, 14],    # untere Reihe Cols 2-4
+    [0, 4, 8],      # Diagonale Cols 0-2
+    [2, 4, 6],      # Diagonale Cols 0-2
+    [3, 7, 11],     # Diagonale Cols 1-3
+    [5, 7, 9],      # Diagonale Cols 1-3
+    [6, 10, 14],    # Diagonale Cols 2-4
+    [8, 10, 12],    # Diagonale Cols 2-4
+]
+NUM_WIN_LINES = len(WIN_LINES)
+
 # main menu###########################
 class Menu:
     def __init__(self):
@@ -300,48 +334,35 @@ class Settings:
 class Game:
     def __init__(self):
         self.mut = 0
-        self.wins = [0, 0, 0, 0, 0]
+        self.wins = [0] * NUM_WIN_LINES
         self.keys = 1
         self.credit = 20
         self.bet = 1
         self.lastwin = 0
         self.show = []
-        
+        self.npos = NUM_COLS * NUM_ROWS
+
         self.screen = screen
-        
+
         self.bsound = pygame.mixer.Sound("data/sounds/CLICK10A.WAV")
-        self.rasound = pygame.mixer.Sound("data/sounds/film_projector.wav")
-        self.rbsound = pygame.mixer.Sound("data/sounds/film_projector.wav")
-        self.rcsound = pygame.mixer.Sound("data/sounds/film_projector.wav")
+        self.rollsound = pygame.mixer.Sound("data/sounds/film_projector.wav")
         self.bgsound = pygame.mixer.Sound("data/sounds/background001.wav")
         self.beepsound = pygame.mixer.Sound("data/sounds/beep.wav")
-        self.background = pygame.image.load("data/img/bg.png")
-        self.rlayer = pygame.image.load("data/img/rlayer.png")
-        self.windowlayer = pygame.image.load("data/img/windowlayer.png")
-        self.imgone = pygame.image.load("data/img/1.png")
-        self.imgtwo = pygame.image.load("data/img/2.png")
-        self.imgthree = pygame.image.load("data/img/3.png")
-        self.imgfour = pygame.image.load("data/img/4.png")
-        self.imgfive = pygame.image.load("data/img/5.png")
-        self.imgsix = pygame.image.load("data/img/6.png")
-        self.imgseven = pygame.image.load("data/img/7.png")
-        self.imgeight = pygame.image.load("data/img/8.png")
-        
-        img = []
-        img.append(self.imgone)
-        img.append(self.imgtwo)
-        img.append(self.imgthree)
-        img.append(self.imgfour)
-        img.append(self.imgfive)
-        img.append(self.imgsix)
-        img.append(self.imgseven)
-        img.append(self.imgeight)
-        
+
+        self.background = pygame.Surface((SCREEN_W, SCREEN_H))
+        self.background.fill([10, 10, 30])
+        pygame.draw.rect(self.background, [40, 40, 80],
+                         (REEL_X0 - 4, REEL_Y0 - 4,
+                          NUM_COLS * COL_W + 8, NUM_ROWS * ROW_H + 8), 0, 8)
+
+        self.raw_imgs = []
+        for i in range(1, NUM_SYMBOLS + 1):
+            img = pygame.image.load(f"data/img/{i}.png")
+            self.raw_imgs.append(pygame.transform.scale(img, (SYMB_W, SYMB_H)))
+
         self.bgsound.play(loops=-1)
-        
         self.randi()
-        
-        # mainloop
+
         while True:
             self.screen.fill([0, 0, 0])
             self.screen.blit(self.background, (0, 0))
@@ -353,7 +374,6 @@ class Game:
                 if event.type == pygame.QUIT:
                     self.bgsound.stop()
                     exit()
-                    
                 if event.type == pygame.KEYDOWN:
                     self.bsound.play()
                     if event.key in (pygame.K_LEFT, EG_SPIN) and self.keys == 1:
@@ -362,15 +382,11 @@ class Game:
                                 self.bet = self.credit
                             self.credit = self.credit - self.bet
                             self.randi()
-                            self.check()
-                            self.roll(img)
-                            self.screen.blit(self.background, (0, 0))
-                            self.drawl()
+                            self.roll()
                             self.winner()
                         elif self.credit == 0 and self.bet == 0:
                             self.bgsound.stop()
                             plc = Menu()
-                            
                     if self.credit > 0:
                         if event.key in (pygame.K_UP, EG_BET_UP) and self.keys == 1:
                             if self.credit - self.bet - 1 >= 0:
@@ -388,10 +404,8 @@ class Game:
                             self.bet = min(self.credit, 10)
                     else:
                         self.bet = 0
-
                     if event.key in (EG_ADD_CREDIT, EG_ADD_CREDIT2):
                         self.credit = self.credit + 5
-
                     if event.key in (pygame.K_F1, EG_HELP):
                         if self.keys == 1:
                             self.keys = 0
@@ -399,271 +413,167 @@ class Game:
                         elif self.keys == 0:
                             self.keys = 1
                             self.menu = "n"
-
                     if event.key in (pygame.K_RETURN, EG_COLLECT):
                         self.keys = 0
                         self.menu = "e"
-
                     if event.key in (pygame.K_ESCAPE, EG_EXIT, EG_ESCAPE) and self.keys == 1:
                         self.bgsound.stop()
                         plc = Menu()
-                            
+
             self.draw_side()
-            
             if self.mut == 1:
                 self.drawl()
                 self.check()
-                self.wins = [0, 0, 0, 0, 0]
-            
+                self.wins = [0] * NUM_WIN_LINES
             if self.credit == 0 and self.bet == 0:
                 font = pygame.font.Font("data/LiberationSans-Regular.ttf", 55)
-                text_surface = font.render("Game Over", True, [255, 0, 0])
-                self.screen.blit(text_surface, (70, 190))
-            
-            self.screen.blit(self.rlayer, (37, 48))
-            self.screen.blit(self.windowlayer, (0, 0))
-            
+                ts = font.render("Game Over", True, [255, 0, 0])
+                self.screen.blit(ts, (70, 190))
+
             if self.keys == 0 and self.menu == "h":
                 self.helpmenu()
             if self.keys == 0 and self.menu == "e":
                 self.endthegame(scr)
-            
+
             pygame.display.update()
-    
-    def roll(self, img):
-        szam = 0
-        
-        
-        # toll time
-        rolla = randrange(5, 14)
-        rollb = randrange(rolla+1, rolla+5)
-        rollc = randrange(rollb+1, rollb+5)
-        
-        # a column
-        rollaf = []
-        rollaf.append(img[int(self.show[0])-1])
-        rollaf.append(img[int(self.show[1])-1])
-        rollaf.append(img[int(self.show[2])-1])
-        while szam <= rolla-3:
-            rollaf.append(img[randrange(0, 8)])
-            szam = szam + 1
-        self.rasound.play()
-        rollaf.append(img[int(self.showold[0])-1])
-        rollaf.append(img[int(self.showold[1])-1])
-        rollaf.append(img[int(self.showold[2])-1])
-        
-            
-        szam = 0
-        
-        # b column
-        rollbf = []
-        rollbf.append(img[int(self.show[3])-1])
-        rollbf.append(img[int(self.show[4])-1])
-        rollbf.append(img[int(self.show[5])-1])
-        while szam <= rollb-3:
-            rollbf.append(img[randrange(0, 8)])
-            szam = szam +1
-        self.rbsound.play()
-        rollbf.append(img[int(self.showold[3])-1])
-        rollbf.append(img[int(self.showold[4])-1])
-        rollbf.append(img[int(self.showold[5])-1])
-            
-        szam = 0
-        
-        # c column
-        rollcf = []
-        rollcf.append(img[int(self.show[6])-1])
-        rollcf.append(img[int(self.show[7])-1])
-        rollcf.append(img[int(self.show[8])-1])
-        while szam <= rollc-3:
-            rollcf.append(img[randrange(0, 8)])
-            szam = szam +1
-        self.rcsound.play()
-        rollcf.append(img[int(self.showold[6])-1])
-        rollcf.append(img[int(self.showold[7])-1])
-        rollcf.append(img[int(self.showold[8])-1])
-        
-        szama = len(rollaf)-1
-        szamb = len(rollbf)-1
-        szamc = len(rollcf)-1
-        
-        while szamc > 2:
+
+    def col_x(self, col):
+        return REEL_X0 + col * COL_W
+
+    def row_y(self, row):
+        return REEL_Y0 + row * ROW_H
+
+    def roll(self):
+        rs = []
+        roll_ticks = []
+        last = randrange(5, 9)
+        for c in range(NUM_COLS):
+            last = randrange(last + 1, last + 4)
+            roll_ticks.append(last)
+            frames = []
+            for r in range(NUM_ROWS):
+                idx = c * NUM_ROWS + r
+                frames.append(self.raw_imgs[int(self.show[idx]) - 1])
+            for _ in range(roll_ticks[c] - NUM_ROWS):
+                frames.append(self.raw_imgs[randrange(0, NUM_SYMBOLS)])
+            for r in range(NUM_ROWS):
+                idx = c * NUM_ROWS + r
+                frames.append(self.raw_imgs[int(self.showold[idx]) - 1])
+            self.rollsound.play()
+            rs.append(frames)
+
+        ptrs = [len(f) - 1 for f in rs]
+
+        while ptrs[NUM_COLS - 1] > NUM_ROWS - 1:
             self.screen.fill([0, 0, 0])
             self.screen.blit(self.background, (0, 0))
-            
-            if szama > 2:
-                self.screen.blit(rollaf[len(rollaf)-3], (36, 46))
-                self.screen.blit(rollaf[len(rollaf)-2], (36, 174))
-                self.screen.blit(rollaf[len(rollaf)-1], (36, 302))
-                szama = szama - 1
-                del(rollaf[len(rollaf)-1])
-            else:
-                self.screen.blit(rollaf[len(rollaf)-3], (36, 46))
-                self.screen.blit(rollaf[len(rollaf)-2], (36, 174))
-                self.screen.blit(rollaf[len(rollaf)-1], (36, 302))
-                self.rasound.stop()
-                
-            if szamb > 2:
-                self.screen.blit(rollbf[len(rollbf)-3], (165, 46))
-                self.screen.blit(rollbf[len(rollbf)-2], (165, 174))
-                self.screen.blit(rollbf[len(rollbf)-1], (165, 302))
-                szamb = szamb - 1
-                del(rollbf[len(rollbf)-1])
-            else:
-                self.screen.blit(rollbf[len(rollbf)-3], (165, 46))
-                self.screen.blit(rollbf[len(rollbf)-2], (165, 174))
-                self.screen.blit(rollbf[len(rollbf)-1], (165, 302))
-                self.rbsound.stop()
-                
-            if szamc > 2:
-                self.screen.blit(rollcf[len(rollcf)-3], (295, 46))
-                self.screen.blit(rollcf[len(rollcf)-2], (295, 174))
-                self.screen.blit(rollcf[len(rollcf)-1], (295, 302))
-                szamc = szamc - 1
-                del(rollcf[len(rollcf)-1])
-            else:
-                self.screen.blit(rollcf[len(rollcf)-3], (295, 46))
-                self.screen.blit(rollcf[len(rollcf)-2], (295, 174))
-                self.screen.blit(rollcf[len(rollcf)-1], (295, 302))
-            
+            for c in range(NUM_COLS):
+                x = self.col_x(c)
+                if ptrs[c] > NUM_ROWS - 1:
+                    for r in range(NUM_ROWS):
+                        self.screen.blit(rs[c][ptrs[c] - (NUM_ROWS - 1 - r)],
+                                         (x, self.row_y(r)))
+                    ptrs[c] = ptrs[c] - 1
+                    rs[c].pop(len(rs[c]) - 1)
+                else:
+                    for r in range(NUM_ROWS):
+                        self.screen.blit(rs[c][ptrs[c] - (NUM_ROWS - 1 - r)],
+                                         (x, self.row_y(r)))
             self.draw_side()
-            self.screen.blit(self.rlayer, (37, 48))
-            self.screen.blit(self.windowlayer, (0, 0))
             pygame.display.update()
-            rollc = rollc - 1
-        self.rcsound.stop()
-    
-    def draw_side(self):
-        #animation
-        digifont = pygame.font.Font("data/DIGITAL2.ttf",24)
-        text_surface = digifont.render("88888888888", True, [60, 0, 0])
-        self.screen.blit(text_surface, (470, 50))
-        
-        text_surface = digifont.render("F1 FOR HELP", True, [255, 0, 0])
-        self.screen.blit(text_surface, (470, 50))
-        
-        font = pygame.font.Font("data/LiberationSans-Regular.ttf", 15)
-        text_surface = font.render("Bet:", True, [230, 255, 255])
-        self.screen.blit(text_surface, (500, 185))
-        # multip
-        digifont = pygame.font.Font("data/DIGITAL2.ttf",24)
-        text_surface = digifont.render("88", True, [60, 0, 0])
-        self.screen.blit(text_surface, (500, 210))
-        text_surface = digifont.render(str(self.bet), True, [255, 0, 0])
-        self.screen.blit(text_surface, (500, 210))
-        
-        font = pygame.font.Font("data/LiberationSans-Regular.ttf", 15)
-        text_surface = font.render("Winner Paid:", True, [230, 255, 255])
-        self.screen.blit(text_surface, (500, 255))
-        # last win
-        digifont = pygame.font.Font("data/DIGITAL2.ttf",24)
-        text_surface = digifont.render("888", True, [60, 0, 0])
-        self.screen.blit(text_surface, (500, 280))
-        text_surface = digifont.render(str(self.lastwin), True, [255, 0, 0])
-        self.screen.blit(text_surface, (500, 280))
-        
-        font = pygame.font.Font("data/LiberationSans-Regular.ttf", 15)
-        text_surface = font.render("Credit:", True, [230, 255, 255])
-        self.screen.blit(text_surface, (500, 325))
-        # startsum
-        digifont = pygame.font.Font("data/DIGITAL2.ttf",24)
-        text_surface = digifont.render("888888", True, [60, 0, 0])
-        self.screen.blit(text_surface, (500, 350))
-        text_surface = digifont.render(str(self.credit), True, [255, 0, 0])
-        self.screen.blit(text_surface, (500, 350))
-    
-    def drawl(self):        
-        self.screen.blit(pygame.image.load("data/img/"+str(self.show[0])+".png"), (36, 46))
-        self.screen.blit(pygame.image.load("data/img/"+str(self.show[1])+".png"), (36, 174))
-        self.screen.blit(pygame.image.load("data/img/"+str(self.show[2])+".png"), (36, 302))
-        self.screen.blit(pygame.image.load("data/img/"+str(self.show[3])+".png"), (165, 46))
-        self.screen.blit(pygame.image.load("data/img/"+str(self.show[4])+".png"), (165, 174))
-        self.screen.blit(pygame.image.load("data/img/"+str(self.show[5])+".png"), (165, 302))
-        self.screen.blit(pygame.image.load("data/img/"+str(self.show[6])+".png"), (295, 46))
-        self.screen.blit(pygame.image.load("data/img/"+str(self.show[7])+".png"), (295, 174))
-        self.screen.blit(pygame.image.load("data/img/"+str(self.show[8])+".png"), (295, 302))
 
-    # random images
+    def draw_side(self):
+        sx = REEL_X0 + NUM_COLS * COL_W + 30
+        digifont = pygame.font.Font("data/DIGITAL2.ttf", 24)
+        font = pygame.font.Font("data/LiberationSans-Regular.ttf", 15)
+
+        ts = digifont.render("F1 FOR HELP", True, [255, 0, 0])
+        self.screen.blit(ts, (sx, 50))
+
+        ts = font.render("Bet:", True, [230, 255, 255])
+        self.screen.blit(ts, (sx, 185))
+        ts = digifont.render(str(self.bet), True, [255, 0, 0])
+        self.screen.blit(ts, (sx, 210))
+
+        ts = font.render("Winner Paid:", True, [230, 255, 255])
+        self.screen.blit(ts, (sx, 255))
+        ts = digifont.render(str(self.lastwin), True, [255, 0, 0])
+        self.screen.blit(ts, (sx, 280))
+
+        ts = font.render("Credit:", True, [230, 255, 255])
+        self.screen.blit(ts, (sx, 325))
+        ts = digifont.render(str(self.credit), True, [255, 0, 0])
+        self.screen.blit(ts, (sx, 350))
+
+    def drawl(self):
+        for idx in range(self.npos):
+            col = idx // NUM_ROWS
+            row = idx % NUM_ROWS
+            img = self.raw_imgs[int(self.show[idx]) - 1]
+            self.screen.blit(img, (self.col_x(col), self.row_y(row)))
+
     def randi(self):
         self.showold = []
         if len(self.show) > 1:
-            self.showold = self.show
+            self.showold = list(self.show)
         else:
-            self.showold = ["8", "8", "8", "8", "8", "8", "8", "8", "8"]
+            self.showold = ["8"] * self.npos
         self.mut = 1
-        ran = {}
-        ran[0] = randrange(1, 335)
-        ran[1] = randrange(1, 335)
-        ran[2] = randrange(1, 335)
-        ran[3] = randrange(1, 335)
-        ran[4] = randrange(1, 335)
-        ran[5] = randrange(1, 335)
-        ran[6] = randrange(1, 335)
-        ran[7] = randrange(1, 335)
-        ran[8] = randrange(1, 335)
         self.show = []
-        for n in ran:
-            if 1 <= ran[n] <= 5:
+        for _ in range(self.npos):
+            r = randrange(1, 335)
+            if r <= 5:
                 self.show.append("8")
-            if 6 <= ran[n] <= 15:
+            elif r <= 15:
                 self.show.append("7")
-            if 16 <= ran[n] <= 30:
+            elif r <= 30:
                 self.show.append("6")
-            if 31 <= ran[n] <= 50:
+            elif r <= 50:
                 self.show.append("5")
-            if 51 <= ran[n] <= 120:
+            elif r <= 120:
                 self.show.append("4")
-            if 121 <= ran[n] <= 180:
+            elif r <= 180:
                 self.show.append("3")
-            if 181 <= ran[n] <= 253:
+            elif r <= 253:
                 self.show.append("2")
-            if 254 <= ran[n] <= 334:
+            else:
                 self.show.append("1")
-                
+
     def check(self):
-        if self.show[0] == self.show[3] == self.show[6]:
-            pygame.draw.line(self.screen, [246, 226, 0], (36, 111), (423, 111), 8)
-            self.wins[0] = self.show[0]
-        if self.show[1] == self.show[4] == self.show[7]:
-            pygame.draw.line(self.screen, [246, 226, 0], (36, 239), (423, 239), 8)
-            self.wins[1] = self.show[1]
-        if self.show[2] == self.show[5] == self.show[8]:
-            pygame.draw.line(self.screen, [246, 226, 0], (36, 367), (423, 367), 8)
-            self.wins[2] = self.show[2]
-        if self.show[0] == self.show[4] == self.show[8]:
-            pygame.draw.line(self.screen, [246, 226, 0], (37, 47), (422, 433), 8)
-            self.wins[3] = self.show[0]
-        if self.show[2] == self.show[4] == self.show[6]:
-            pygame.draw.line(self.screen, [246, 226, 0], (37, 432), (422, 47), 8)
-            self.wins[4] = self.show[2]
-            
+        self.wins = [0] * NUM_WIN_LINES
+        for li, line in enumerate(WIN_LINES):
+            if self.show[line[0]] == self.show[line[1]] == self.show[line[2]]:
+                c0, r0 = line[0] // NUM_ROWS, line[0] % NUM_ROWS
+                c2, r2 = line[2] // NUM_ROWS, line[2] % NUM_ROWS
+                x1 = self.col_x(c0) + SYMB_W // 2
+                y1 = self.row_y(r0) + SYMB_H // 2
+                x2 = self.col_x(c2) + SYMB_W // 2
+                y2 = self.row_y(r2) + SYMB_H // 2
+                pygame.draw.line(self.screen, [246, 226, 0], (x1, y1), (x2, y2), 6)
+                self.wins[li] = int(self.show[line[0]])
+
     def winner(self):
         self.lastwin = 0
         for n in self.wins:
-            winsu = self.bet*int(n)
-            winsum = winsu + self.bet
-            if winsum > self.bet:
+            if n > 0:
+                winsum = self.bet * n + self.bet
                 self.credit = self.credit + winsum
                 self.lastwin = self.lastwin + winsum
                 self.beepsound.play()
-            
+
     def helpmenu(self):
         pygame.draw.line(self.screen, [176, 176, 176], (50, 250), (590, 250), 400)
         font = pygame.font.Font("data/LiberationSans-Regular.ttf", 15)
-        text_surface = font.render("How to play:", True, [255, 255, 255])
-        self.screen.blit(text_surface, (60, 60))
-        text_surface = font.render("New spin: left arrow", True, [255, 255, 255])
-        self.screen.blit(text_surface, (60, 80))
-        text_surface = font.render("Raise bet: arrow up", True, [255, 255, 255])
-        self.screen.blit(text_surface, (60, 100))
-        text_surface = font.render("To end game to high score press Enter", True, [255, 255, 255])
-        self.screen.blit(text_surface, (60, 120))
-        text_surface = font.render("To close this as game over help press F1", True, [255, 255, 255])
-        self.screen.blit(text_surface, (60, 160))
-        
+        self.screen.blit(font.render("How to play:", True, [255, 255, 255]), (60, 60))
+        self.screen.blit(font.render("New spin: left arrow", True, [255, 255, 255]), (60, 80))
+        self.screen.blit(font.render("Raise bet: arrow up", True, [255, 255, 255]), (60, 100))
+        self.screen.blit(font.render("To end game to high score press Enter", True, [255, 255, 255]), (60, 120))
+        self.screen.blit(font.render("To close this as game over help press F1", True, [255, 255, 255]), (60, 160))
+
     def endthegame(self, scr):
         scrb = int(scr)
         pygame.draw.line(self.screen, [176, 176, 176], (50, 250), (590, 250), 400)
+        font = pygame.font.Font("data/LiberationSans-Regular.ttf", 15)
         if self.credit > scrb:
             font = pygame.font.Font("data/LiberationSans-Regular.ttf", 15)
             text_surface = font.render("You have a new high score!!!", True, [255, 255, 255])
@@ -737,7 +647,7 @@ if __name__ == "__main__":
     for i in range(pygame.joystick.get_count()):
         j = pygame.joystick.Joystick(i)
         j.init()
-    screen = pygame.display.set_mode([640, 480], 0, 24)
+    screen = pygame.display.set_mode([SCREEN_W, SCREEN_H], 0, 24)
     pygame.display.set_caption("BFruit")
     pygame.mouse.set_visible(False)
     
