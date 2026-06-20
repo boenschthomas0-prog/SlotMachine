@@ -29,17 +29,33 @@ import os
 
 VERSION = "0.1.2"
 
-# EG Starts USB Encoder (10 Buttons -> Tasten 1-0)
-EG_BET_UP = pygame.K_1      # Button 1  -> bet up
-EG_BET_DOWN = pygame.K_2    # Button 2  -> bet down
-EG_SPIN = pygame.K_3        # Button 3  -> spin / enter
-EG_ADD_CREDIT = pygame.K_4  # Button 4  -> +5 credits
-EG_ADD_CREDIT2 = pygame.K_5 # Button 5  -> +5 credits
-EG_MAX_BET = pygame.K_6     # Button 6  -> max bet
-EG_HELP = pygame.K_7        # Button 7  -> help
-EG_COLLECT = pygame.K_8     # Button 8  -> collect / end game
-EG_EXIT = pygame.K_9        # Button 9  -> exit to menu
-EG_ESCAPE = pygame.K_0      # Button 10 -> escape
+# EG Starts -> Joystick Button Mapping (DragonRise Generic USB Joystick, 12 Buttons)
+JOY_TO_KEY = {
+    0: pygame.K_7,   # EG Button 1  -> HELP
+    1: pygame.K_1,   # EG Button 2  -> BET UP
+    2: pygame.K_2,   # EG Button 3  -> BET DOWN
+    3: pygame.K_5,   # EG Button 4  -> +5 Credits
+    4: pygame.K_6,   # EG Button 5  -> MAX BET
+    5: pygame.K_4,   # EG Button 6  -> +5 Credits
+    6: pygame.K_8,   # EG Button 7  -> COLLECT
+    7: pygame.K_9,   # EG Button 8  -> EXIT
+    8: pygame.K_0,   # EG Button 9  -> ESCAPE
+    9: pygame.K_0,   # EG Button 10 -> ESCAPE
+    10: pygame.K_9,  # EG Button 11 -> EXIT
+    11: pygame.K_3,  # EG Button 12 -> SPIN
+}
+
+# Aktionen (referenziert von Tastatur + Joystick)
+EG_BET_UP = pygame.K_1
+EG_BET_DOWN = pygame.K_2
+EG_SPIN = pygame.K_3
+EG_ADD_CREDIT = pygame.K_4
+EG_ADD_CREDIT2 = pygame.K_5
+EG_MAX_BET = pygame.K_6
+EG_HELP = pygame.K_7
+EG_COLLECT = pygame.K_8
+EG_EXIT = pygame.K_9
+EG_ESCAPE = pygame.K_0
 
 # main menu###########################
 class Menu:
@@ -73,6 +89,10 @@ class Menu:
         self.showhs = False # show hs in menu
         while True:
             for self.event in pygame.event.get():
+                if self.event.type == pygame.JOYBUTTONDOWN:
+                    k = JOY_TO_KEY.get(self.event.button)
+                    if k is not None:
+                        self.event = pygame.event.Event(pygame.KEYDOWN, key=k)
                 if self.selectedmenu == 2:
                     self.showhs = True
                 else:
@@ -196,6 +216,10 @@ class Settings:
         szamlalo = 0
         while True:
             for self.event in pygame.event.get():
+                if self.event.type == pygame.JOYBUTTONDOWN:
+                    k = JOY_TO_KEY.get(self.event.button)
+                    if k is not None:
+                        self.event = pygame.event.Event(pygame.KEYDOWN, key=k)
                 if self.event.type == pygame.QUIT:
                     exit()
                 if self.event.type == pygame.KEYDOWN:
@@ -322,6 +346,10 @@ class Game:
             self.screen.fill([0, 0, 0])
             self.screen.blit(self.background, (0, 0))
             for event in pygame.event.get():
+                if event.type == pygame.JOYBUTTONDOWN:
+                    k = JOY_TO_KEY.get(event.button)
+                    if k is not None:
+                        event = pygame.event.Event(pygame.KEYDOWN, key=k)
                 if event.type == pygame.QUIT:
                     self.bgsound.stop()
                     exit()
@@ -650,7 +678,9 @@ class Game:
             text_surface = font.render("You ended the game, but you don't have a new high score...", True, [255, 255, 255])
             self.screen.blit(text_surface, (60, 60))
         for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN:
+            if event.type in (pygame.QUIT, pygame.KEYDOWN, pygame.JOYBUTTONDOWN):
+                if event.type == pygame.QUIT:
+                    exit()
                 self.bgsound.stop()
                 plc = Menu()
     
@@ -703,6 +733,10 @@ if __name__ == "__main__":
 
     # pygame init, set display
     pygame.init()
+    pygame.joystick.init()
+    for i in range(pygame.joystick.get_count()):
+        j = pygame.joystick.Joystick(i)
+        j.init()
     screen = pygame.display.set_mode([640, 480], 0, 24)
     pygame.display.set_caption("BFruit")
     pygame.mouse.set_visible(False)
@@ -717,7 +751,7 @@ if __name__ == "__main__":
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 exit()
-            if event.type == pygame.KEYDOWN:
+            if event.type in (pygame.KEYDOWN, pygame.JOYBUTTONDOWN):
                 plc = Menu()
         screen.fill([0, 0, 0])
         border.set_alpha(szam)
@@ -777,11 +811,10 @@ if __name__ == "__main__":
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 exit()
-            if event.type == pygame.KEYDOWN:
+            if event.type in (pygame.KEYDOWN, pygame.JOYBUTTONDOWN):
                 plc = Menu()
-                
+
         screen.blit(border, (160, 120))
-        
         screen.blit(point, (185, 150))
         screen.blit(point, (185, 180))
         screen.blit(point, (185, 210))
